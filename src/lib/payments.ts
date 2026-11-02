@@ -61,9 +61,10 @@ export async function confirmListingPayment(
     })
     .eq("id", user.id)
 
+  // The payment itself is verified, so let the customer through even if this
+  // bookkeeping write fails. Creating a business does not depend on the flag.
   if (profileError) {
     console.error("Failed to unlock listing after payment", profileError)
-    return false
   }
 
   const { error: paymentError } = await db.from("payments").upsert(
