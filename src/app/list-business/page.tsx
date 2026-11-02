@@ -4,7 +4,9 @@ import { connection } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { BusinessForm } from "@/components/business-form"
 import { PayToList } from "@/components/pay-to-list"
+import { PaymentPending } from "@/components/payment-pending"
 import { getCategories } from "@/lib/queries"
+import { confirmListingPayment } from "@/lib/payments"
 
 export const metadata: Metadata = {
   title: "List Your Business — Tradeza",
@@ -13,14 +15,34 @@ export const metadata: Metadata = {
 
 export const instant = false
 
-export default async function ListBusinessPage() {
+const FAILED_STATUSES = ["failed", "cancelled", "expired"]
+
+export default async function ListBusinessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    payment?: string
+    payment_id?: string
+    status?: string
+  }>
+}) {
   await connection()
+  const params = await searchParams
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) redirect("/login?next=%2Flist-business")
+  if (!user) {
+    const query = new URLSearchParams({ payment: "success" })
+    if (params.payment_id) query.set("payment_id", params.payment_id)
+    if (params.status) query.set("status", params.status)
+    const next =
+      params.payment === "success"
+        ? `/list-business?${query.toString()}`
+        : "/list-business"
+    redirect(`/login?next=${encodeURIComponent(next)}`)
+  }
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -28,8 +50,20 @@ export default async function ListBusinessPage() {
     .eq("id", user.id)
     .maybeSingle()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const hasPaid = (profile as any)?.has_paid_listing === true
+  let hasPaid = profile?.has_paid_listing === true
+
+  // Dodo appends payment_id/status to the return_url. Verify it server-side so
+  // the listing unlocks immediately, even if the webhook has not arrived yet.
+  if (!hasPaid && params.payment === "success" && params.payment_id) {
+    hasPaid = await confirmListingPayment(supabase, user, params.payment_id)
+  }
+
+  const paymentFailed = FAILED_STATUSES.includes(params.status ?? "")
+  const paymentPending =
+    !hasPaid &&
+    params.payment === "success" &&
+    !paymentFailed &&
+    Boolean(params.payment_id)
 
   const categories = await getCategories()
 
@@ -45,11 +79,28 @@ export default async function ListBusinessPage() {
           </p>
         </div>
         {hasPaid ? (
-          <div className="bg-surface-container-lowest border border-[#E4E9E3] rounded-2xl p-8 custom-card-shadow">
-            <BusinessForm categories={categories} />
-          </div>
+          <>
+            {params.payment === "success" && (
+              <div className="mb-6 bg-[#EDF3ED] text-[#236B50] font-body-sm text-body-sm rounded-xl px-4 py-3 border border-[#CCD5CB]">
+                Payment successful — your listing is unlocked. Add your
+                business below.
+              </div>
+            )}
+            <div className="bg-surface-container-lowest border border-[#E4E9E3] rounded-2xl p-8 custom-card-shadow">
+              <BusinessForm categories={categories} />
+            </div>
+          </>
+        ) : paymentPending ? (
+          <PaymentPending />
         ) : (
-          <PayToList />
+          <>
+            {paymentFailed && (
+              <div className="mb-6 bg-error-container text-on-error-container font-body-sm text-body-sm rounded-xl px-4 py-3 border border-[#FFDAD6]">
+                Payment was not completed. Please try again.
+              </div>
+            )}
+            <PayToList />
+          </>
         )}
       </div>
     </section>

@@ -36,7 +36,13 @@ function StatusBadge({ status }: { status: string }) {
 export default async function MyBusinessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ created?: string; updated?: string }>
+  searchParams: Promise<{
+    created?: string
+    updated?: string
+    payment?: string
+    payment_id?: string
+    status?: string
+  }>
 }) {
   await connection()
   const supabase = await createClient()
@@ -45,7 +51,18 @@ export default async function MyBusinessPage({
   } = await supabase.auth.getUser()
   if (!user) redirect("/login")
 
-  const [{ data: profile }, businesses, opportunities, params] = await Promise.all([
+  const params = await searchParams
+
+  // Older checkouts returned here. Send the customer to the business form so
+  // they can actually create their listing after paying.
+  if (params.payment === "success") {
+    const query = new URLSearchParams({ payment: "success" })
+    if (params.payment_id) query.set("payment_id", params.payment_id)
+    if (params.status) query.set("status", params.status)
+    redirect(`/list-business?${query.toString()}`)
+  }
+
+  const [{ data: profile }, businesses, opportunities] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name, avatar_url, email")
@@ -53,7 +70,6 @@ export default async function MyBusinessPage({
       .maybeSingle(),
     getUserBusinesses(user.id),
     getUserOpportunities(user.id),
-    searchParams,
   ])
 
   const displayName =

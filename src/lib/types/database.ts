@@ -208,14 +208,69 @@ export type Database = {
           },
         ]
       }
+      payments: {
+        Row: {
+          amount: number
+          business_id: string | null
+          created_at: string
+          currency: string
+          dodo_checkout_id: string | null
+          dodo_payment_id: string | null
+          id: string
+          metadata: Json | null
+          product_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          business_id?: string | null
+          created_at?: string
+          currency?: string
+          dodo_checkout_id?: string | null
+          dodo_payment_id?: string | null
+          id?: string
+          metadata?: Json | null
+          product_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          business_id?: string | null
+          created_at?: string
+          currency?: string
+          dodo_checkout_id?: string | null
+          dodo_payment_id?: string | null
+          id?: string
+          metadata?: Json | null
+          product_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
           created_at: string
           email: string
           full_name: string | null
+          has_paid_listing: boolean
           id: string
           language: string
+          paid_at: string | null
           updated_at: string
         }
         Insert: {
@@ -223,8 +278,10 @@ export type Database = {
           created_at?: string
           email: string
           full_name?: string | null
+          has_paid_listing?: boolean
           id: string
           language?: string
+          paid_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -232,8 +289,10 @@ export type Database = {
           created_at?: string
           email?: string
           full_name?: string | null
+          has_paid_listing?: boolean
           id?: string
           language?: string
+          paid_at?: string | null
           updated_at?: string
         }
         Relationships: []
